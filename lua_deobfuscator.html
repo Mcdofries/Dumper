@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LuaDump — Advanced Deobfuscator</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --bg: #080c10;
+  --panel: #0d1117;
+  --border: #1a2535;
+  --accent: #00f5a0;
+  --accent2: #00c3ff;
+  --warn: #ff6b35;
+  --dim: #3a4a5c;
+  --text: #c9d8e8;
+  --text-dim: #5a7080;
+  --glow: 0 0 20px rgba(0,245,160,0.25);
+  --glow2: 0 0 20px rgba(0,195,255,0.25);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,245,160,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,245,160,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 30px 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Header */
+header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo-icon {
+  width: 46px; height: 46px;
+  border: 2px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  box-shadow: var(--glow), inset 0 0 12px rgba(0,245,160,0.1);
+  animation: pulse-border 3s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%,100% { box-shadow: var(--glow), inset 0 0 12px rgba(0,245,160,0.1); }
+  50% { box-shadow: 0 0 35px rgba(0,245,160,0.45), inset 0 0 18px rgba(0,245,160,0.2); }
+}
+
+h1 {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--accent);
+  text-shadow: 0 0 30px rgba(0,245,160,0.5);
+}
+
+h1 span { color: var(--accent2); }
+
+.version-tag {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  margin-top: 3px;
+}
+
+/* Input section */
+.input-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) { .input-section { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 16px;
+  position: relative;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
+.panel-label {
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+/* File drop zone */
+.drop-zone {
+  border: 1px dashed var(--dim);
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(0,245,160,0.04);
+}
+
+.drop-zone input[type=file] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+
+.drop-icon { font-size: 2rem; margin-bottom: 8px; opacity: 0.5; }
+.drop-text { font-size: 0.8rem; color: var(--text-dim); }
+.drop-text strong { color: var(--accent); }
+#file-name { margin-top: 8px; font-size: 0.75rem; color: var(--accent2); min-height: 16px; }
+
+textarea {
+  width: 100%;
+  height: 160px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--dim);
+  padding: 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+textarea:focus { border-color: var(--accent); }
+textarea::placeholder { color: var(--dim); }
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  padding: 10px 22px;
+  border: none;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  font-weight: bold;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: rgba(255,255,255,0.2);
+  transition: left 0.3s;
+}
+
+.btn-primary:hover::before { left: 100%; }
+.btn-primary:hover { box-shadow: var(--glow); }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--dim);
+}
+
+.btn-secondary:hover { border-color: var(--accent2); color: var(--accent2); }
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Pass selector */
+.pass-label { font-size: 0.7rem; color: var(--text-dim); margin-right: 4px; }
+.pass-select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--dim);
+  padding: 8px 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.75rem;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Detection badges */
+.detection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  min-height: 34px;
+  align-items: center;
+}
+
+.badge {
+  font-size: 0.65rem;
+  letter-spacing: 1.5px;
+  padding: 4px 10px;
+  text-transform: uppercase;
+  border: 1px solid;
+  animation: badge-in 0.3s ease;
+}
+
+@keyframes badge-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.badge-green { color: var(--accent); border-color: var(--accent); background: rgba(0,245,160,0.07); }
+.badge-blue { color: var(--accent2); border-color: var(--accent2); background: rgba(0,195,255,0.07); }
+.badge-orange { color: var(--warn); border-color: var(--warn); background: rgba(255,107,53,0.07); }
+.badge-dim { color: var(--text-dim); border-color: var(--dim); }
+
+/* Progress */
+.progress-wrap {
+  height: 3px;
+  background: var(--border);
+  margin-bottom: 16px;
+  overflow: hidden;
+  display: none;
+}
+
+.progress-wrap.active { display: block; }
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  width: 0%;
+  transition: width 0.3s;
+  box-shadow: 0 0 8px var(--accent);
+}
+
+/* Output area */
+.output-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
+}
+
+.tab {
+  font-size: 0.65rem;
+  letter-spacing: 1.5px;
+  padding: 7px 16px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  transition: all 0.15s;
+  border-bottom: none;
+}
+
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--panel); color: var(--accent); border-color: var(--border); }
+
+.output-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 16px;
+  display: none;
+  position: relative;
+}
+
+.output-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent2), transparent);
+}
+
+.output-panel.active { display: block; }
+
+.copy-btn {
+  position: absolute;
+  top: 14px; right: 14px;
+  font-size: 0.65rem;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--dim);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: 'Share Tech Mono', monospace;
+  transition: all 0.15s;
+}
+
+.copy-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+pre {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 500px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--dim) transparent;
+  padding-right: 80px;
+}
+
+pre.highlight-green { color: var(--accent); }
+
+/* Stats row */
+.stats-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.stat {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.stat span { color: var(--accent); font-size: 0.85rem; }
+
+/* Strings list */
+.strings-list { max-height: 400px; overflow-y: auto; }
+.string-item {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
+  display: flex;
+  gap: 10px;
+}
+
+.string-item:hover { background: rgba(0,245,160,0.03); }
+.string-idx { color: var(--dim); min-width: 36px; }
+.string-val { color: var(--accent); word-break: break-all; }
+
+/* URLs */
+.url-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.url-dot { width: 6px; height: 6px; background: var(--warn); border-radius: 50%; flex-shrink: 0; }
+.url-val { color: var(--warn); font-size: 0.78rem; word-break: break-all; }
+
+/* Log */
+.log-list { max-height: 300px; overflow-y: auto; }
+.log-item {
+  font-size: 0.72rem;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  display: flex;
+  gap: 10px;
+}
+
+.log-time { color: var(--dim); min-width: 55px; }
+.log-ok { color: var(--accent); }
+.log-info { color: var(--accent2); }
+.log-warn { color: var(--warn); }
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.empty-icon { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.3; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--dim); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="logo-icon">⚙</div>
+    <div>
+      <h1>LUA<span>DUMP</span></h1>
+      <div class="version-tag">ADVANCED DEOBFUSCATOR v2.0 — MULTI-PASS ENGINE</div>
+    </div>
+  </header>
+
+  <!-- Input -->
+  <div class="input-section">
+
+    <div class="panel">
+      <div class="panel-label">▸ Upload File</div>
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept=".lua,.txt,.luac">
+        <div class="drop-icon">📂</div>
+        <div class="drop-text">Drop <strong>.lua / .txt / .luac</strong> here<br>or click to browse</div>
+        <div id="file-name"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-label">▸ Paste Code</div>
+      <textarea id="input" placeholder="-- paste obfuscated Lua here..."></textarea>
+    </div>
+
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-primary" onclick="runDeobfuscate()">⚡ Deobfuscate</button>
+    <button class="btn btn-secondary" onclick="clearAll()">✕ Clear</button>
+    <span class="pass-label">PASSES:</span>
+    <select class="pass-select" id="passes">
+      <option value="1">1 — Quick</option>
+      <option value="3" selected>3 — Standard</option>
+      <option value="5">5 — Deep</option>
+      <option value="10">10 — Brute</option>
+    </select>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+
+  <!-- Detection badges -->
+  <div class="detection-bar" id="detection-bar">
+    <span style="font-size:0.65rem;color:var(--dim);letter-spacing:1px;">AWAITING INPUT...</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="output-tabs">
+    <div class="tab active" onclick="switchTab('deobf')">Deobfuscated</div>
+    <div class="tab" onclick="switchTab('strings')">Strings</div>
+    <div class="tab" onclick="switchTab('urls')">URLs / IPs</div>
+    <div class="tab" onclick="switchTab('log')">Pass Log</div>
+  </div>
+
+  <!-- Output panels -->
+  <div class="output-panel active" id="tab-deobf">
+    <button class="copy-btn" onclick="copyOut('deobf-pre')">COPY</button>
+    <pre id="deobf-pre"><div class="empty-state"><div class="empty-icon">🔍</div>Output will appear here</div></pre>
+    <div class="stats-row" id="stats-row" style="display:none">
+      <div class="stat">SIZE REDUCTION <span id="stat-size">—</span></div>
+      <div class="stat">PASSES APPLIED <span id="stat-passes">—</span></div>
+      <div class="stat">STRINGS FOUND <span id="stat-strings">—</span></div>
+      <div class="stat">URLS FOUND <span id="stat-urls">—</span></div>
+      <div class="stat">TECHNIQUES <span id="stat-tech">—</span></div>
+    </div>
+  </div>
+
+  <div class="output-panel" id="tab-strings">
+    <button class="copy-btn" onclick="copyStrings()">COPY</button>
+    <div class="strings-list" id="strings-list">
+      <div class="empty-state"><div class="empty-icon">📋</div>No strings extracted yet</div>
+    </div>
+  </div>
+
+  <div class="output-panel" id="tab-urls">
+    <div id="urls-list">
+      <div class="empty-state"><div class="empty-icon">🌐</div>No URLs or IPs found</div>
+    </div>
+  </div>
+
+  <div class="output-panel" id="tab-log">
+    <div class="log-list" id="log-list">
+      <div class="empty-state"><div class="empty-icon">📜</div>Run deobfuscation to see log</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let fileContent = null;
+let logEntries  = [];
+let allStrings  = [];
+let allURLs     = [];
+let passCount   = 0;
+
+// ─── File Handling ────────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) loadFile(fileInput.files[0]);
+});
+
+function loadFile(f) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    fileContent = reader.result;
+    document.getElementById('file-name').textContent = '✓ ' + f.name + '  (' + formatBytes(f.size) + ')';
+    document.getElementById('input').value = '';
+    addLog('info', 'File loaded: ' + f.name);
+  };
+  reader.readAsText(f);
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + 'B';
+  return (b/1024).toFixed(1) + 'KB';
+}
+
+// ─── UI Helpers ───────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['deobf','strings','urls','log'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.output-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function clearAll() {
+  fileContent = null;
+  document.getElementById('input').value = '';
+  document.getElementById('file-name').textContent = '';
+  document.getElementById('deobf-pre').innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div>Output will appear here</div>';
+  document.getElementById('strings-list').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>No strings extracted yet</div>';
+  document.getElementById('urls-list').innerHTML = '<div class="empty-state"><div class="empty-icon">🌐</div>No URLs or IPs found</div>';
+  document.getElementById('log-list').innerHTML = '<div class="empty-state"><div class="empty-icon">📜</div>Run deobfuscation to see log</div>';
+  document.getElementById('detection-bar').innerHTML = '<span style="font-size:0.65rem;color:var(--dim);letter-spacing:1px;">AWAITING INPUT...</span>';
+  document.getElementById('stats-row').style.display = 'none';
+  logEntries = []; allStrings = []; allURLs = [];
+}
+
+function copyOut(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent).then(() => alert('Copied!'));
+}
+
+function copyStrings() {
+  const text = allStrings.join('\n');
+  navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+}
+
+function addLog(type, msg) {
+  const ts = new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  logEntries.push({ type, msg, ts });
+}
+
+function renderLog() {
+  const el = document.getElementById('log-list');
+  if (!logEntries.length) return;
+  el.innerHTML = logEntries.map(e =>
+    `<div class="log-item"><span class="log-time">${e.ts}</span><span class="log-${e.type}">${e.msg}</span></div>`
+  ).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function setProgress(pct) {
+  const wrap = document.getElementById('progress-wrap');
+  const bar  = document.getElementById('progress-bar');
+  wrap.classList.toggle('active', pct > 0 && pct < 100);
+  bar.style.width = pct + '%';
+  if (pct >= 100) setTimeout(() => wrap.classList.remove('active'), 400);
+}
+
+// ─── Detection ────────────────────────────────────────────────────────────────
+function detectTechniques(code) {
+  const techs = [];
+
+  if (/\\[0-9]{1,3}/.test(code))                     techs.push({l:'ASCII ESCAPE',c:'blue'});
+  if (/\\x[0-9a-fA-F]{2}/.test(code))                techs.push({l:'HEX ESCAPE',c:'blue'});
+  if (/\\u\{?[0-9a-fA-F]+\}?/.test(code))            techs.push({l:'UNICODE ESCAPE',c:'blue'});
+  if (/table\.concat/.test(code))                     techs.push({l:'TABLE CONCAT',c:'orange'});
+  if (/loadstring/.test(code))                        techs.push({l:'LOADSTRING',c:'orange'});
+  if (/load\s*\(/.test(code))                         techs.push({l:'LOAD()',c:'orange'});
+  if (/require/.test(code))                           techs.push({l:'REQUIRE',c:'blue'});
+  if (/string\.char/.test(code))                      techs.push({l:'STRING.CHAR',c:'orange'});
+  if (/string\.byte/.test(code))                      techs.push({l:'STRING.BYTE',c:'blue'});
+  if (/string\.rep/.test(code))                       techs.push({l:'STRING.REP',c:'blue'});
+  if (/string\.reverse/.test(code))                  techs.push({l:'STRING.REVERSE',c:'blue'});
+  if (/bit\.bxor|band|bor|bnot|lshift|rshift/.test(code)) techs.push({l:'BITWISE OPS',c:'orange'});
+  if (/pcall|xpcall/.test(code))                     techs.push({l:'PCALL WRAP',c:'blue'});
+  if (/getfenv|setfenv/.test(code))                  techs.push({l:'ENV MANIP',c:'orange'});
+  if (/rawget|rawset/.test(code))                    techs.push({l:'RAW ACCESS',c:'blue'});
+  if (/base64|b64|[A-Za-z0-9+\/]{30,}={0,2}/.test(code)) techs.push({l:'BASE64',c:'orange'});
+  if (/\bmath\.(floor|ceil|abs|fmod)\b/.test(code))  techs.push({l:'MATH OPS',c:'blue'});
+  if (/tostring|tonumber/.test(code))                techs.push({l:'TYPE CONV',c:'blue'});
+  if (/for\s+\w+\s*=\s*\d+/.test(code))             techs.push({l:'NUMERIC FOR',c:'dim'});
+  if (/0x[0-9a-fA-F]+/.test(code))                  techs.push({l:'HEX LITERALS',c:'blue'});
+  if (/_ENV/.test(code))                             techs.push({l:'_ENV ACCESS',c:'orange'});
+  if (/debug\.getinfo|debug\.traceback/.test(code))  techs.push({l:'DEBUG API',c:'orange'});
+  if (/coroutine/.test(code))                        techs.push({l:'COROUTINE',c:'blue'});
+  if (/[a-z]{20,}/.test(code))                       techs.push({l:'LONG IDENTS',c:'orange'});
+  if (/\b[a-zA-Z]\d{4,}\b/.test(code))              techs.push({l:'GARBLED NAMES',c:'orange'});
+  if (/[^\x00-\x7E]/.test(code))                    techs.push({l:'NON-ASCII CHARS',c:'orange'});
+
+  if (!techs.length) techs.push({l:'PLAIN LUA',c:'green'});
+  return techs;
+}
+
+function renderBadges(techs) {
+  const bar = document.getElementById('detection-bar');
+  bar.innerHTML = techs.map(t =>
+    `<span class="badge badge-${t.c}">${t.l}</span>`
+  ).join('');
+}
+
+// ─── Deobfuscation Engine ─────────────────────────────────────────────────────
+
+/**
+ * 1. ASCII numeric escapes:  \65 \108 \108
+ */
+function passAsciiEscape(code) {
+  const before = code;
+  code = code.replace(/\\([0-9]{1,3})/g, (m,p) => {
+    const n = parseInt(p);
+    return n <= 127 ? String.fromCharCode(n) : m;
+  });
+  if (code !== before) addLog('ok', 'Pass: ASCII numeric escapes decoded');
+  return code;
+}
+
+/**
+ * 2. Hex escapes: \x41 \x6C
+ */
+function passHexEscape(code) {
+  const before = code;
+  code = code.replace(/\\x([0-9a-fA-F]{2})/g, (m,p) => String.fromCharCode(parseInt(p,16)));
+  if (code !== before) addLog('ok', 'Pass: Hex escapes decoded (\\xNN)');
+  return code;
+}
+
+/**
+ * 3. Unicode escapes: \u0041  \u{1F600}
+ */
+function passUnicodeEscape(code) {
+  const before = code;
+  code = code.replace(/\\u\{([0-9a-fA-F]+)\}/g, (m,p) => String.fromCodePoint(parseInt(p,16)));
+  code = code.replace(/\\u([0-9a-fA-F]{4})/g,   (m,p) => String.fromCharCode(parseInt(p,16)));
+  if (code !== before) addLog('ok', 'Pass: Unicode escapes decoded (\\uNNNN)');
+  return code;
+}
+
+/**
+ * 4. string.char() — string.char(65,108,108)
+ */
+function passStringChar(code) {
+  const before = code;
+  // Multi-arg string.char
+  code = code.replace(/string\.char\(([\d,\s]+)\)/g, (m, args) => {
+    try {
+      const chars = args.split(',').map(n => parseInt(n.trim()));
+      if (chars.some(isNaN)) return m;
+      return '"' + chars.map(c => {
+        const ch = String.fromCharCode(c);
+        if (ch === '"') return '\\"';
+        if (ch === '\\') return '\\\\';
+        return ch;
+      }).join('') + '"';
+    } catch { return m; }
+  });
+  if (code !== before) addLog('ok', 'Pass: string.char() calls resolved');
+  return code;
+}
+
+/**
+ * 5. Hex numeric literals — 0x41 => 65, 0x48656C6C6F => "Hello" if in string context
+ */
+function passHexLiterals(code) {
+  const before = code;
+  // Inline hex ints to decimals
+  code = code.replace(/\b0x([0-9a-fA-F]+)\b/g, (m,p) => {
+    const n = parseInt(p,16);
+    // Keep large hex (likely addresses) as-is unless small
+    return n < 0x10000 ? String(n) : m;
+  });
+  if (code !== before) addLog('ok', 'Pass: Hex literals converted to decimal');
+  return code;
+}
+
+/**
+ * 6. table.concat({...},{...}) reconstruction
+ */
+function passTableConcat(code) {
+  const before = code;
+  // Pattern: table.concat({str1, str2, ...}, "sep")  or table.concat({...})
+  code = code.replace(/table\.concat\(\s*\{([\s\S]*?)\}\s*(?:,\s*"([^"]*)"\s*)?\)/g, (m, body, sep) => {
+    try {
+      const parts = [];
+      // Extract quoted strings
+      const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+      let mm;
+      while ((mm = re.exec(body)) !== null) parts.push(mm[1] !== undefined ? mm[1] : mm[2]);
+      if (!parts.length) return m;
+      return '"' + parts.join(sep || '') + '"';
+    } catch { return m; }
+  });
+  if (code !== before) addLog('ok', 'Pass: table.concat() reconstructed');
+  return code;
+}
+
+/**
+ * 7. String concatenation folding: "hello" .. " " .. "world" => "hello world"
+ */
+function passStringConcat(code) {
+  const before = code;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const next = code.replace(/"((?:[^"\\]|\\.)*)"\s*\.\.\s*"((?:[^"\\]|\\.)*)"/g, (m,a,b) => {
+      changed = true;
+      return '"' + a + b + '"';
+    });
+    next !== code && (code = next);
+  }
+  if (code !== before) addLog('ok', 'Pass: String concatenation folded');
+  return code;
+}
+
+/**
+ * 8. string.reverse("dlrow olleh") => "hello world"
+ */
+function passStringReverse(code) {
+  const before = code;
+  code = code.replace(/string\.reverse\("((?:[^"\\]|\\.)*)"\)/g, (m,s) => {
+    return '"' + s.split('').reverse().join('') + '"';
+  });
+  if (code !== before) addLog('ok', 'Pass: string.reverse() resolved');
+  return code;
+}
+
+/**
+ * 9. string.rep("x",5) => "xxxxx"
+ */
+function passStringRep(code) {
+  const before = code;
+  code = code.replace(/string\.rep\("((?:[^"\\]|\\.)*)"\s*,\s*(\d+)(?:\s*,\s*"([^"]*)")?\)/g, (m,s,n,sep) => {
+    const count = parseInt(n);
+    if (count > 10000) return m;
+    return '"' + Array(count).fill(s).join(sep||'') + '"';
+  });
+  if (code !== before) addLog('ok', 'Pass: string.rep() resolved');
+  return code;
+}
+
+/**
+ * 10. Base64 decode — finds base64 strings and decodes them
+ */
+const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function b64decode(str) {
+  str = str.replace(/[^A-Za-z0-9+/=]/g,'');
+  if (str.length < 8) return null;
+  try {
+    const bin = atob(str);
+    // Only return if printable ASCII
+    if ([...bin].every(c => c.charCodeAt(0) >= 9 && c.charCodeAt(0) <= 126)) return bin;
+    return null;
+  } catch { return null; }
+}
+
+function passBase64(code) {
+  const before = code;
+  // Look for base64-looking strings (min 12 chars, valid alphabet, optional padding)
+  code = code.replace(/"([A-Za-z0-9+\/]{12,}={0,2})"/g, (m, s) => {
+    const dec = b64decode(s);
+    if (dec && dec.length > 3) {
+      addLog('ok', `Pass: Base64 decoded: "${s.slice(0,20)}..." => "${dec.slice(0,40)}"`);
+      return '"' + dec.replace(/"/g,'\\"') + '"';
+    }
+    return m;
+  });
+  return code;
+}
+
+/**
+ * 11. Bitwise XOR decoding — simple XOR key patterns
+ *     e.g. {n1^k, n2^k, ...} or bit.bxor(byte, key)
+ */
+function passXorDecode(code) {
+  const before = code;
+
+  // Pattern: bit.bxor(N, KEY) where both are constants
+  code = code.replace(/bit\.bxor\((\d+)\s*,\s*(\d+)\)/g, (m,a,b) => {
+    return String(parseInt(a) ^ parseInt(b));
+  });
+
+  // XOR array: {65^13, 66^13, ...}  =>  decode and rebuild string
+  code = code.replace(/\{((?:\d+\^(?:\d+)(?:\s*,\s*)?)+)\}/g, (m, body) => {
+    try {
+      const pairs = body.split(',').map(s => s.trim().split('^').map(Number));
+      if (pairs.some(p => p.length !== 2 || isNaN(p[0]) || isNaN(p[1]))) return m;
+      const chars = pairs.map(([a,k]) => String.fromCharCode(a^k));
+      if (chars.every(c => c.charCodeAt(0) >= 32 && c.charCodeAt(0) <= 126)) {
+        addLog('ok', 'Pass: XOR byte array decoded');
+        return '"' + chars.join('').replace(/"/g,'\\"') + '"';
+      }
+    } catch {}
+    return m;
+  });
+
+  return code;
+}
+
+/**
+ * 12. Arithmetic simplification — fold constant math expressions
+ */
+function safeMathEval(expr) {
+  // Only allow digits, operators, spaces, parens
+  if (!/^[\d\s+\-*\/()%^]+$/.test(expr)) return null;
+  if (/[a-zA-Z_$]/.test(expr)) return null;
+  try {
+    // eslint-disable-next-line no-new-func
+    const v = Function('"use strict"; return (' + expr + ')')();
+    if (typeof v === 'number' && isFinite(v) && !isNaN(v)) return String(Math.trunc(v));
+  } catch {}
+  return null;
+}
+
+function passMathSimplify(code) {
+  const before = code;
+  // Match parenthesized arithmetic or simple binary ops
+  code = code.replace(/\(\s*(\d[\d\s+\-*\/()%]*?\d)\s*\)/g, (m, expr) => {
+    const r = safeMathEval(expr);
+    return r !== null ? r : m;
+  });
+  // Simple binary: 100 + 56  /  200 - 44
+  code = code.replace(/\b(\d{1,8})\s*([+\-*\/])\s*(\d{1,8})\b/g, (m,a,op,b) => {
+    const r = safeMathEval(a+op+b);
+    return r !== null ? r : m;
+  });
+  if (code !== before) addLog('ok', 'Pass: Arithmetic constants simplified');
+  return code;
+}
+
+/**
+ * 13. tostring(N) / tonumber("N") simplify
+ */
+function passTypeConv(code) {
+  const before = code;
+  code = code.replace(/tostring\((\d+(?:\.\d+)?)\)/g, (m,n) => '"' + n + '"');
+  code = code.replace(/tonumber\("(\d+(?:\.\d+)?)"\)/g, (m,n) => n);
+  if (code !== before) addLog('ok', 'Pass: tostring/tonumber constants resolved');
+  return code;
+}
+
+/**
+ * 14. Variable substitution — track simple const assignments and substitute
+ *     local a = "hello"  =>  later uses of a become "hello"
+ */
+function passConstSubstitute(code) {
+  // Collect: local <id> = "<string literal>"
+  const vars = {};
+  const assignRe = /local\s+([a-zA-Z_]\w*)\s*=\s*"((?:[^"\\]|\\.)*)"/g;
+  let m;
+  while ((m = assignRe.exec(code)) !== null) {
+    vars[m[1]] = m[2];
+  }
+
+  if (!Object.keys(vars).length) return code;
+
+  let changed = false;
+  for (const [name, val] of Object.entries(vars)) {
+    // Only substitute in concatenation / function call context, not in assignments
+    const re = new RegExp(`(?<![\\w.])${name}(?![\\w(])`, 'g');
+    const next = code.replace(re, (mm, offset) => {
+      // Don't replace the original assignment
+      const prefix = code.slice(Math.max(0, offset-20), offset);
+      if (/local\s+\w+\s*=\s*$/.test(prefix)) return mm;
+      changed = true;
+      return '"' + val + '"';
+    });
+    code = next;
+  }
+
+  if (changed) addLog('ok', 'Pass: Constant string variables substituted');
+  return code;
+}
+
+/**
+ * 15. Index-based table loader rebuild
+ *     local t = {"a","b","c",...}  combined with table.concat or index access
+ */
+function passIndexedTableRebuild(code) {
+  const before = code;
+
+  // Find local table assignments  local t = {"s1","s2",...}
+  const tableRe = /local\s+([a-zA-Z_]\w*)\s*=\s*\{([\s\S]*?)\}/g;
+  const tables = {};
+  let m;
+
+  while ((m = tableRe.exec(code)) !== null) {
+    const name = m[1];
+    const body = m[2];
+    const strings = [];
+    const re2 = /"((?:[^"\\]|\\.)*)"/g;
+    let mm;
+    while ((mm = re2.exec(body)) !== null) strings.push(mm[1]);
+    if (strings.length > 1) tables[name] = strings;
+  }
+
+  // Now look for t[N] access patterns and substitute
+  for (const [name, strings] of Object.entries(tables)) {
+    const accessRe = new RegExp(`${name}\\[(\\d+)\\]`, 'g');
+    code = code.replace(accessRe, (mm, idx) => {
+      const i = parseInt(idx) - 1; // Lua is 1-indexed
+      if (strings[i] !== undefined) {
+        addLog('ok', `Pass: Table access ${name}[${idx}] => "${strings[i].slice(0,20)}"`);
+        return '"' + strings[i] + '"';
+      }
+      return mm;
+    });
+  }
+
+  return code;
+}
+
+/**
+ * 16. ROT13 / simple rotation ciphers
+ */
+function rot13(s) {
+  return s.replace(/[a-z]/gi, c => {
+    const base = c < 'a' ? 65 : 97;
+    return String.fromCharCode(((c.charCodeAt(0) - base + 13) % 26) + base);
+  });
+}
+
+function passRot13(code) {
+  // Detect rot13 by checking if any quoted strings look like ROT13
+  // Heuristic: look for rot13-call patterns or typical rot13 wrappers
+  const before = code;
+  // Pattern: rot13("...") or r13("...") user-defined
+  code = code.replace(/(?:rot13|r13)\("((?:[^"\\]|\\.)*)"\)/g, (m,s) => '"' + rot13(s) + '"');
+  if (code !== before) addLog('ok', 'Pass: ROT13 decoded');
+  return code;
+}
+
+/**
+ * 17. Remove common obfuscation wrappers / boilerplate
+ */
+function passCleanupWrappers(code) {
+  const before = code;
+
+  // Remove   (function() ... end)()  wrappers (keep inner content)
+  // Remove loadstring wrappers
+  code = code.replace(/(?:load|loadstring)\s*\(\s*("(?:[^"\\]|\\.)*")\s*\)\s*\(\s*\)/g, (m,s) => {
+    addLog('info', 'Pass: loadstring wrapper stripped, showing inner string');
+    return '-- [deobfuscated loadstring]\n' + s.slice(1,-1);
+  });
+
+  // Collapse redundant do...end blocks
+  code = code.replace(/\bdo\s*\n(\s*)\bend\b/g, '-- [empty do-end removed]');
+
+  if (code !== before) addLog('ok', 'Pass: Obfuscation wrappers cleaned');
+  return code;
+}
+
+/**
+ * 18. Normalize whitespace & format output lightly
+ */
+function passNormalize(code) {
+  // Collapse 3+ blank lines to 2
+  code = code.replace(/\n{3,}/g, '\n\n');
+  // Strip trailing whitespace per line
+  code = code.split('\n').map(l => l.trimEnd()).join('\n');
+  return code;
+}
+
+/**
+ * 19. Extract all string literals from code
+ */
+function extractAllStrings(code) {
+  const strings = new Set();
+  const re = /"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g;
+  let m;
+  while ((m = re.exec(code)) !== null) {
+    const s = m[1] !== undefined ? m[1] : m[2];
+    if (s.length > 1) strings.add(s);
+  }
+  // Also [[long strings]]
+  const longRe = /\[\[([^\]]*)\]\]/g;
+  while ((m = longRe.exec(code)) !== null) {
+    if (m[1].length > 1) strings.add(m[1]);
+  }
+  return [...strings];
+}
+
+/**
+ * 20. Extract URLs and IPs
+ */
+function extractURLsAndIPs(code) {
+  const found = new Set();
+  const urlRe = /https?:\/\/[^\s"'`<>)]+/g;
+  let m;
+  while ((m = urlRe.exec(code)) !== null) found.add(m[0]);
+  // IP + optional port
+  const ipRe = /\b(\d{1,3}\.){3}\d{1,3}(?::\d{2,5})?\b/g;
+  while ((m = ipRe.exec(code)) !== null) found.add(m[0]);
+  // ws / wss
+  const wsRe = /wss?:\/\/[^\s"'`<>)]+/g;
+  while ((m = wsRe.exec(code)) !== null) found.add(m[0]);
+  return [...found];
+}
+
+// ─── Main Run ─────────────────────────────────────────────────────────────────
+const PASSES = [
+  passAsciiEscape,
+  passHexEscape,
+  passUnicodeEscape,
+  passStringChar,
+  passBase64,
+  passXorDecode,
+  passHexLiterals,
+  passMathSimplify,
+  passTypeConv,
+  passStringReverse,
+  passStringRep,
+  passTableConcat,
+  passStringConcat,
+  passConstSubstitute,
+  passIndexedTableRebuild,
+  passRot13,
+  passCleanupWrappers,
+  passNormalize,
+];
+
+function runDeobfuscate() {
+  const raw = fileContent || document.getElementById('input').value.trim();
+  if (!raw) { alert('No input provided.'); return; }
+
+  logEntries = [];
+  allStrings = [];
+  allURLs    = [];
+  passCount  = 0;
+
+  const maxPasses = parseInt(document.getElementById('passes').value);
+  const techs     = detectTechniques(raw);
+  renderBadges(techs);
+  addLog('info', 'Input: ' + raw.length + ' bytes, ' + raw.split('\n').length + ' lines');
+  addLog('info', 'Detected: ' + techs.map(t=>t.l).join(', '));
+
+  setProgress(5);
+
+  let code = raw;
+
+  // Run N full passes over all transformations
+  for (let p = 0; p < maxPasses; p++) {
+    const before = code;
+    for (const fn of PASSES) {
+      code = fn(code);
+    }
+    passCount++;
+    setProgress(10 + Math.round((p / maxPasses) * 85));
+    if (code === before) {
+      addLog('info', `Converged after ${p+1} pass(es) — no more changes`);
+      break;
+    }
+  }
+
+  // Extract strings and URLs from final result
+  allStrings = extractAllStrings(code);
+  allURLs    = extractURLsAndIPs(code);
+
+  setProgress(100);
+
+  // Render deobfuscated output
+  document.getElementById('deobf-pre').textContent = code;
+
+  // Stats
+  const sizeSaved = Math.round((1 - code.length / raw.length) * 100);
+  document.getElementById('stat-size').textContent    = (sizeSaved > 0 ? '-' + sizeSaved : '+' + Math.abs(sizeSaved)) + '%';
+  document.getElementById('stat-passes').textContent  = passCount;
+  document.getElementById('stat-strings').textContent = allStrings.length;
+  document.getElementById('stat-urls').textContent    = allURLs.length;
+  document.getElementById('stat-tech').textContent    = techs.length;
+  document.getElementById('stats-row').style.display  = 'flex';
+
+  // Render strings
+  if (allStrings.length) {
+    document.getElementById('strings-list').innerHTML = allStrings.map((s, i) =>
+      `<div class="string-item"><span class="string-idx">[${i+1}]</span><span class="string-val">${escHtml(s)}</span></div>`
+    ).join('');
+  } else {
+    document.getElementById('strings-list').innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>No string literals found</div>';
+  }
+
+  // Render URLs
+  if (allURLs.length) {
+    document.getElementById('urls-list').innerHTML = allURLs.map(u =>
+      `<div class="url-item"><div class="url-dot"></div><span class="url-val">${escHtml(u)}</span></div>`
+    ).join('');
+  } else {
+    document.getElementById('urls-list').innerHTML = '<div class="empty-state"><div class="empty-icon">🌐</div>No URLs or IPs found</div>';
+  }
+
+  addLog('ok', `Done. Output: ${code.length} bytes, ${allStrings.length} strings, ${allURLs.length} URLs`);
+  renderLog();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+
+</body>
+</html>
